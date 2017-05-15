@@ -1,3 +1,30 @@
+# Introduction
+
+HBase is a data model that is designed to provide quick random access to huge amounts of structured data. This tutorial shows how to set up HBase on Hadoop File Systems.
+
+One can store the data in HDFS through HBase. Data consumer reads/accesses the data in HDFS randomly using HBase. HBase sits on top of the Hadoop File System and provides read and write access.
+
+Applications such as HBase, Cassandra, couchDB, Dynamo, and MongoDB are some of the databases that store huge amounts of data and access the data in a random manner.
+
+**Storage Mechanism in HBase**
+
+HBase is a column-oriented database and the tables in it are sorted by row. The table schema defines only column families, which are the key value pairs. A table have multiple column families and each column family can have any number of columns. Subsequent column values are stored contiguously on the disk. Each cell value of the table has a timestamp. In short, in an HBase:
+
+* Table is a collection of rows.
+* Row is a collection of column families.
+* Column family is a collection of columns.
+* Column is a collection of key value pairs.
+
+# Google Cloud Instance
+
+For the purpose of this tutorial, we use google clound instance virtual machine to demontrate how to install hbase. However, in real life, if you should most likely use [Bigtable](https://cloud.google.com/bigtable/docs/) provided by Google.
+
+> **Bigtable**
+> 
+> Cloud Bigtable is a fully managed NoSQL database that supports the popular open-source Apache HBase 1.0 API. You can provision Cloud Bigtable instances for your workload, then use the Bigtable HBase client to develop applications using the standard open-source Big Data tools you're familiar with.
+
+But for learning purposes, we will install HBase with a barebone Ubuntu virtual machine. 
+
 ![](./create_project.png)
 
 ![](./create_instance.png)
@@ -288,7 +315,7 @@ yzhong_cs@instance-2:~$ curl localhost:50070
 </html>
 ```
 
-Reference: https://www.tutorialspoint.com/hbase/hbase_installation.htm
+
 
 
 
@@ -399,3 +426,5 @@ Check running dashboard with curl
 Tips:
 
 * Use `jps` to check running process
+
+Reference: https://www.tutorialspoint.com/hbase/hbase_installation.htm
