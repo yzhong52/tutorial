@@ -1,10 +1,11 @@
 # Introduction
 
-HBase is a data model that is designed to provide quick random access to huge amounts of structured data. This tutorial shows how to set up HBase on Hadoop File Systems.
+HBase is a data model that is designed to provide quick random access to huge amounts of structured data. This tutorial shows how to set up HBase on Hadoop File Systems
+using Google Cloud Instance.
 
 One can store the data in HDFS through HBase. Data consumer reads/accesses the data in HDFS randomly using HBase. HBase sits on top of the Hadoop File System and provides read and write access.
 
-Applications such as HBase, Cassandra, couchDB, Dynamo, and MongoDB are some of the databases that store huge amounts of data and access the data in a random manner.
+Apart from HBase, applications such as Cassandra, couchDB, Dynamo, and MongoDB store huge amounts of data and support random access to the data.
 
 **Storage Mechanism in HBase**
 
@@ -15,36 +16,83 @@ HBase is a column-oriented database and the tables in it are sorted by row. The 
 * Column family is a collection of columns.
 * Column is a collection of key value pairs.
 
+**HBase Architecture**
+
+In HBase, tables are split into regions and are served by the region servers. Regions are vertically divided by column families into "Stores". Stores are saved as files in HDFS. Shown below is the architecture of HBase.
+
+HBase has three major components: 
+the client library, 
+a master server, 
+and region servers. 
+Region servers can be added or removed as per requirement.
+
+*Master Server*
+
+* Assigns regions to the region servers and takes the help of Apache ZooKeeper for this task.
+* Handles load balancing of the regions across region servers. It unloads the busy servers and shifts the regions to less occupied servers.
+* Maintains the state of the cluster by negotiating the load balancing.
+* Is responsible for schema changes and other metadata operations such as creation of tables and column families.
+
+*Region server*
+
+Regions are tables that are split up and spread across the region servers. The region servers have regions that:
+
+* Communicate with the client and handle data-related operations.
+* Handle read and write requests for all the regions under it.
+* Decide the size of the region by following the region size thresholds.
+* When we take a deeper look into the region server, it contain regions and stores as shown below:
+
+The store contains memory store and HFiles. Memstore is just like a cache memory. Anything that is entered into the HBase is stored here initially. Later, the data is transferred and saved in Hfiles as blocks and the memstore is flushed.
+
+
+*Zookeeper*
+
+Zookeeper is an open-source project that provides services like maintaining configuration information, naming, providing distributed synchronization, etc.
+
+* Zookeeper has ephemeral nodes representing different region servers. Master servers use these nodes to discover available servers.
+* In addition to availability, the nodes are also used to track server failures or network partitions.
+* Clients communicate with region servers via zookeeper.
+* In pseudo and standalone modes, HBase itself will take care of zookeeper.
+
 # Google Cloud Instance
 
-For the purpose of this tutorial, we use google clound instance virtual machine to demontrate how to install hbase. However, in real life, if you should most likely use [Bigtable](https://cloud.google.com/bigtable/docs/) provided by Google.
+For the purpose of this tutorial, we use google clound instance virtual machine to demontrate how to install hbase. However, in reality, if you should most likely use [Bigtable](https://cloud.google.com/bigtable/docs/) provided by Google.
 
 > **Bigtable**
 > 
 > Cloud Bigtable is a fully managed NoSQL database that supports the popular open-source Apache HBase 1.0 API. You can provision Cloud Bigtable instances for your workload, then use the Bigtable HBase client to develop applications using the standard open-source Big Data tools you're familiar with.
 
-But for learning purposes, we will install HBase with a barebone Ubuntu virtual machine. 
+But we will install HBase with a barebone Ubuntu virtual machine here, just for fun. 
+
+To begin with, let's create a new project,
 
 ![](./create_project.png)
 
+and a most recent version of Ubuntu.
+
 ![](./create_instance.png)
+
+To keep things simple, we will allow both http and https traffics.
 
 ![](./firewall.png)
 
-Creating a User
+That's all we need for setup, now let's SSH to the machine and start the dirty work. 
 
-	yzhong_cs@instance-1:~$ sudo useradd hadoop
-	yzhong_cs@instance-1:~$ sudo passwd hadoop
+# Create Account
+
+It is recommended to create a separate user for Hadoop to isolate the Hadoop file system from the Unix file system. We created a user `hadoop` with password `password` below.
+
+	$ sudo useradd hadoop
+	$ sudo passwd hadoop
 	Enter new UNIX password: password
 	Retype new UNIX password: password
 	passwd: password updated successfully
 
-SSH Setup and Key Generation
-SSH setup is required to perform different operations on the cluster such as start, stop, and distributed daemon shell operations. To authenticate different users of Hadoop, it is required to provide public/private key pair for a Hadoop user and share it with different users.
+SSH setup is required to perform different operations on the cluster such as start, stop, and distributed daemon shell operations. 
 
 The following commands are used to generate a key value pair using SSH. Copy the public keys form id_rsa.pub to authorized_keys, and provide owner, read and write permissions to authorized_keys file respectively.
 
-	yzhong_cs@instance-1:~$ ssh-keygen -t rsa
+	$ ssh-keygen -t rsa
 	Generating public/private rsa key pair.
 	Enter file in which to save the key (/home/yzhong_cs/.ssh/id_rsa): 
 	Enter passphrase (empty for no passphrase): 
@@ -52,7 +100,7 @@ The following commands are used to generate a key value pair using SSH. Copy the
 	Your identification has been saved in /home/yzhong_cs/.ssh/id_rsa.
 	Your public key has been saved in /home/yzhong_cs/.ssh/id_rsa.pub.
 	The key fingerprint is:
-	SHA256:w6PwtUhfZ/vBwTG3P5kXeP2GuPW0b39yElH4HWAz0VE yzhong_cs@instance-1
+	SHA256:w6PwtUhfZ/vBwTG3P5kXeP2GuPW0b39yElH4HWAz0VE yzhong_cs@instance-2
 	The key's randomart image is:
 	+---[RSA 2048]----+
 	|             *+oE|
@@ -65,12 +113,14 @@ The following commands are used to generate a key value pair using SSH. Copy the
 	|             +o=B|
 	|            . .*B|
 	+----[SHA256]-----+
-	yzhong_cs@instance-1:~$ cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-	yzhong_cs@instance-1:~$ chmod 0600 ~/.ssh/authorized_keys
 	
-Verify ssh
 	
-	yzhong_cs@instance-1:~$ ssh localhost
+	$ cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+	$ chmod 0600 ~/.ssh/authorized_keys
+	
+Verify ssh installation is correct.
+	
+	$ ssh localhost
 	The authenticity of host 'localhost (127.0.0.1)' can't be established.
 	ECDSA key fingerprint is SHA256:foTRdAvYNamSZnErNmLUAuKC+OL/3YtqkzbdOraTe2c.
 	Are you sure you want to continue connecting (yes/no)? yes
@@ -93,64 +143,49 @@ Verify ssh
 	
 	Last login: Sun May 14 02:38:00 2017 from 173.194.90.32
 
-Exit from ssh
+Finally, don't forget to exit from ssh.
 
-	yzhong_cs@instance-1:~$ exit
+	$ exit
+	logout
+	Connection to localhost closed.
 	
-Install Java
+# Install Java
+
+If you have Java installed on the machine, you can skip this step. Otherwise, let's install it.
 	
-	yzhong_cs@instance-1:~$ sudo apt-get update
-	yzhong_cs@instance-1:~$ sudo sudo apt-get install default-jre
-	yzhong_cs@instance-1:~$ sudo apt-get install default-jdk
-	yzhong_cs@instance-1:~$ java -version
+	$ sudo apt-get update
+	$ sudo sudo apt-get install default-jre
+	$ sudo apt-get install default-jdk
+
+And check its version to make sure that we've installed java successfully. 
+
+	$ java -version
 	openjdk version "1.8.0_131"
 	OpenJDK Runtime Environment (build 1.8.0_131-8u131-b11-0ubuntu1.16.10.2-b11)
 	OpenJDK 64-Bit Server VM (build 25.131-b11, mixed mode)
+
+For setting up `PATH` and `JAVA_HOME` variables, add the following commands to ~/.profile file.
 	
-	
-	yzhong_cs@instance-1:~$ export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
-	yzhong_cs@instance-1:~$ export PATH=$PATH:$JAVA_HOME/bin
-
-Install Hadoop
-
-	yzhong_cs@instance-1:~$ wget http://apache.mirrors.tds.net/hadoop/common/hadoop-2.8.0/hadoop-2.8.0.tar.gz
-	yzhong_cs@instance-1:~$ tar -xzvf hadoop-2.8.0.tar.gz
-	yzhong_cs@instance-1:~$ sudo mv hadoop-2.8.0 /usr/local/hadoop
-	
-Set `JAVA_HOME`:
-
-	nano /usr/local/hadoop/etc/hadoop/hadoop-env.sh
-	
-	export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
-
-
-Validate hadoop installation by running the example project: 
-
-	yzhong_cs@instance-1:~$ mkdir ~/input
-	yzhong_cs@instance-1:~$ cp /usr/local/hadoop/etc/hadoop/*.xml ~/input
-	yzhong_cs@instance-1:~$ /usr/local/hadoop/bin/hadoop jar /usr/local/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-2.8.0.jar grep ~/input ~/grep_example 'principal[.]*'
-	
-	yzhong_cs@instance-1:~$ cat ~/grep_example/*
-	6       principal
-	1       principal.
-
-Reference: https://www.digitalocean.com/community/tutorials/how-to-install-hadoop-in-stand-alone-mode-on-ubuntu-16-04 
-
-Add these to `~/.profile`
-
 	export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
 	export PATH=$PATH:$JAVA_HOME/bin
-	
-	export HADOOP_HOME=/usr/local/hadoop
-	export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin
 
-Then 
+And follow by
 
-	yzhong_cs@instance-1:~$ source .profile
+	$ source ~/.profile
 
-Check Hadoop version
+# Install Hadoop
 
-	yzhong_cs@instance-1:~$ hadoop version
+Go to the apache website to check for the most recent version of hadoop [http://hadoop.apache.org/releases.html](http://hadoop.apache.org/releases.html) and also pick a recommanded remote url. 
+
+We download hadoop and put it under `/usr/local/hadoop` folder.
+
+	$ wget http://apache.mirrors.tds.net/hadoop/common/hadoop-2.8.0/hadoop-2.8.0.tar.gz
+	$ tar -xzvf hadoop-2.8.0.tar.gz
+	$ sudo mv hadoop-2.8.0 /usr/local/hadoop
+
+Quickly, check hadoop version:
+
+	$ /usr/local/hadoop version
 	Hadoop 2.8.0
 	Subversion https://git-wip-us.apache.org/repos/asf/hadoop.git -r 91f2b7a13d1e97be65db92ddabc627cc29ac0009
 	Compiled by jdu on 2017-03-17T04:12Z
@@ -158,12 +193,49 @@ Check Hadoop version
 	From source with checksum 60125541c2b3e266cbf3becc5bda666
 	This command was run using /usr/local/hadoop/share/hadoop/common/hadoop-common-2.8.0.jar
 
+Set `JAVA_HOME` in the `hadoop-env.sh` shell script under `/usr/local/hadoop/etc/hadoop/` folder. 
+	
+	# The only required environment variable is JAVA_HOME.  All others are
+	# optional.  When running a distributed configuration it is best to
+	# set JAVA_HOME in this file, so that it is correctly defined on
+	# remote nodes.
+	# The java implementation to use.
+	export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
 
-# Configurations
+Validate hadoop installation by running the example project: 
 
-	cd /usr/local/hadoop/etc/hadoop
+	$ mkdir ~/input
+	$ cp /usr/local/hadoop/etc/hadoop/*.xml ~/input
+	$ /usr/local/hadoop/bin/hadoop jar /usr/local/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-2.8.0.jar grep ~/input ~/grep_example 'principal[.]*'
+	
+Results are stored in the output directory and can be checked by running cat on the output directory:
+
+	$ cat ~/grep_example/*
+	6       principal
+	1       principal.
+
+The MapReduce task found one occurrence of the word principal followed by a period and six occurrences where it was not. Running the example program has verified that our stand-alone installation is working properly. 
+
+Set `HADOOP_HOME` and `PATH` in `~/.profile`, 
+	
+	export HADOOP_HOME=/usr/local/hadoop
+	export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin
+
+And again,
+
+	$ source .profile
+
+# Hadoop Configurations
+
+All the hadoop configuration files are store under the following folder: 
+
+	cd $HADOOP_HOME/etc/hadoop
 
 **core-site.xml**
+
+The core-site.xml file contains information such as the port number used for Hadoop instance, memory allocated for file system, memory limit for storing data, and the size of Read/Write buffers.
+
+Open core-site.xml and add the following properties in between the `<configuration>` and `</configuration>` tags.
 
 ```
 <configuration>
@@ -176,6 +248,8 @@ Check Hadoop version
 
 
 **hdfs-site.xml**
+
+The hdfs-site.xml file contains information such as the value of replication data, namenode path, and datanode path of your local file systems, where you want to store the Hadoop infrastructure.
 
 ```
 <configuration>
@@ -209,6 +283,10 @@ Check Hadoop version
 
 **mapred-site.xml**
 
+This file is used to specify which MapReduce framework we are using. By default, Hadoop contains a template of yarn-site.xml. First of all, it is required to copy the file from mapred-site.xml.template to mapred-site.xml file using the following command.
+
+	$ cp mapred-site.xml.template mapred-site.xml
+
 ```
 <configuration>
    <property>
@@ -218,12 +296,11 @@ Check Hadoop version
 </configuration>
 ```
 
-Verifying Hadoop Installation
+**Verifying Hadoop installation**
 
 	$ cd ~
 	$ sudo su
 	$ hdfs namenode -format
-	
 	...
 	...
 	...
@@ -239,7 +316,7 @@ Verifying Hadoop Installation
 	************************************************************/
 
 
-Verifying Hadoop dfs
+**Verifying Hadoop dfs**
 
 ```
 yzhong_cs@instance-2:~$ start-dfs.sh
@@ -279,6 +356,7 @@ Starting secondary namenodes [0.0.0.0]
 0.0.0.0: starting secondarynamenode, logging to /usr/local/hadoop/logs/hadoop-yzhong_cs-secondarynamenode-instance-2.out
 ```
 
+**Verifying Yarn script**
 
 ```
 yzhong_cs@instance-2:~$ start-yarn.sh
@@ -287,61 +365,46 @@ starting resourcemanager, logging to /usr/local/hadoop/logs/yarn-yzhong_cs-resou
 localhost: starting nodemanager, logging to /usr/local/hadoop/logs/yarn-yzhong_cs-nodemanager-instance-2.out
 ```
 
-```
-yzhong_cs@instance-2:~$ curl localhost:50070
-<!--
-   Licensed to the Apache Software Foundation (ASF) under one or more
-   contributor license agreements.  See the NOTICE file distributed with
-   this work for additional information regarding copyright ownership.
-   The ASF licenses this file to You under the Apache License, Version 2.0
-   (the "License"); you may not use this file except in compliance with
-   the License.  You may obtain a copy of the License at
+That's all about installing hadoop. We will check the hadoop dashboard with the following urls:
 
-       http://www.apache.org/licenses/LICENSE-2.0
+* [http://104.198.67.52:50070/dfshealth.html](http://104.198.67.52:50070/dfshealth.html)
+  ![](dfs_health.png)
+* [http://104.198.67.52:8088/cluster](http://104.198.67.52:8088/cluster)
+  ![](hadoop_cluster.png)
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
--->
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-<meta http-equiv="REFRESH" content="0;url=dfshealth.html" />
-<title>Hadoop Administration</title>
-</head>
-</html>
-```
-
-
-
+Well, don't forget to replace 104.198.67.52 with your vm's ip address.
 
 
 # Install Hbase
 
-	yzhong_cs@instance-2:~$ wget http://apache.mirror.gtcomm.net/hbase/stable/hbase-1.2.5-bin.tar.gz
-	yzhong_cs@instance-2:~$ tar -zxvf hbase-1.2.5-bin.tar.gz 
-	yzhong_cs@instance-2:~$ sudo mv hbase-1.2.5 /usr/local/Hbase/
+We can install HBase in any of the three modes: Standalone mode, Pseudo Distributed mode, and Fully Distributed mode. We are installing HBase in Pseudo-Distributed Mode here.
 
-ADD THESE TO `.profile`	
+Go to apache website [http://www.apache.org/dyn/closer.cgi/hbase/](http://www.apache.org/dyn/closer.cgi/hbase/) again to check for the most recent version of HBase. And download it into folder `/usr/local/HBase/`
+
+	$ wget http://apache.mirror.gtcomm.net/hbase/stable/hbase-1.2.5-bin.tar.gz
+	$ tar -zxvf hbase-1.2.5-bin.tar.gz 
+	$ sudo mv hbase-1.2.5 /usr/local/HBase/
+
+Add these to `.profile`	,
 
 	export HBASE_HOME=/usr/local/Hbase
 	export PATH=$PATH:$HBASE_HOME/bin
+	
+and follow by
 
-Edit `JAVA_HOME`
+	source ~/.profile
 
-	yzhong_cs@instance-2:~$ nano /usr/local/Hbase/conf/hbase-env.sh
+Edit `JAVA_HOME` in shell script `hbase-env.sh` under folder `/usr/local/Hbase/conf/`
 	
 	# The java implementation to use.  Java 1.7+ required.
-	# export JAVA_HOME=/usr/java/jdk1.6.0/
 	export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
 	
 
-Configurations:
+# HBase Configurations
 
-	yzhong_cs@instance-2:~$ nano /usr/local/Hbase/conf/hbase-site.xml 
+All the configuration files are under folder `/usr/local/Hbase/conf/`.
+
+**hbase-site.xml **
 	
 ```
 <configuration>
@@ -364,8 +427,10 @@ Configurations:
 </configuration>
 ```
 
+Finally, before we start HBase, we have to make sure that hadoop is running. You can use `jps` to check running process. And we can start HBase with the following.
+
 ```
-yzhong_cs@instance-2:~$ /usr/local/Hbase/bin/start-hbase.sh 
+$ /usr/local/HBase/bin/start-hbase.sh 
 localhost: starting zookeeper, logging to /usr/local/Hbase/bin/../logs/hbase-yzhong_cs-zookeeper-instance-2.out
 starting master, logging to /usr/local/Hbase/bin/../logs/hbase-yzhong_cs-master-instance-2.out
 OpenJDK 64-Bit Server VM warning: ignoring option PermSize=128m; support was removed in 8.0
@@ -373,7 +438,7 @@ OpenJDK 64-Bit Server VM warning: ignoring option MaxPermSize=128m; support was 
 starting regionserver, logging to /usr/local/Hbase/bin/../logs/hbase-yzhong_cs-1-regionserver-instance-2.out
 ```
 
-Entering hbase shell
+Entering hbase shell.
 
 ```
 root@instance-2:/home/yzhong_cs# hbase shell
@@ -389,7 +454,11 @@ Version 1.2.5, rd7b05f79dee10e0ada614765bb354b93d615a157, Wed Mar  1 00:34:48 CS
 hbase(main):001:0> 
 ```
 
-All in One Logs:
+All-in-one logs:
+
+* Start dfs
+* Start yarn
+* Start HBase
 
 ```
 root@instance-2:/home/yzhong_cs# start-dfs.sh
@@ -398,16 +467,23 @@ localhost: starting namenode, logging to /usr/local/hadoop/logs/hadoop-root-name
 -yarn.shlocalhost: starting datanode, logging to /usr/local/hadoop/logs/hadoop-root-datanode-instance-2.out
 Starting secondary namenodes [0.0.0.0]
 0.0.0.0: starting secondarynamenode, logging to /usr/local/hadoop/logs/hadoop-root-secondarynamenode-instance-2.out
+
 root@instance-2:/home/yzhong_cs# start-yarn.sh
 starting yarn daemons
 starting resourcemanager, logging to /usr/local/hadoop/logs/yarn-root-resourcemanager-instance-2.out
 localhost: starting nodemanager, logging to /usr/local/hadoop/logs/yarn-root-nodemanager-instance-2.out
+
 root@instance-2:/home/yzhong_cs# start-hbase.sh
 localhost: starting zookeeper, logging to /usr/local/Hbase/bin/../logs/hbase-root-zookeeper-instance-2.out
 starting master, logging to /usr/local/Hbase/logs/hbase-root-master-instance-2.out
 OpenJDK 64-Bit Server VM warning: ignoring option PermSize=128m; support was removed in 8.0
 OpenJDK 64-Bit Server VM warning: ignoring option MaxPermSize=128m; support was removed in 8.0
 starting regionserver, logging to /usr/local/Hbase/logs/hbase-root-1-regionserver-instance-2.out
+```
+
+HBase creates its directory in HDFS. To see the created directory, browse to Hadoop bin and type the following command.
+
+```
 root@instance-2:/home/yzhong_cs# hadoop fs -ls /hbase
 Found 7 items
 drwxr-xr-x   - root supergroup          0 2017-05-15 02:03 /hbase/.tmp
@@ -419,12 +495,13 @@ drwxr-xr-x   - root supergroup          0 2017-05-15 02:03 /hbase/data
 drwxr-xr-x   - root supergroup          0 2017-05-15 02:02 /hbase/oldWALs
 ```
 
-Check running dashboard with curl
+That’s all about installing HBase. We will check the hadoop dashboard with the following urls:
 
-	curl localhost:16010/master-status
+* http://104.198.67.52:16010/master-status
+  ![](hbase_master.png)
 
-Tips:
 
-* Use `jps` to check running process
+Reference: 
 
-Reference: https://www.tutorialspoint.com/hbase/hbase_installation.htm
+* https://www.digitalocean.com/community/tutorials/how-to-install-hadoop-in-stand-alone-mode-on-ubuntu-16-04  
+* https://www.tutorialspoint.com/hbase/hbase_installation.htm
