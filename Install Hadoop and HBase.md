@@ -1,4 +1,6 @@
-# Introduction
+# Install Hadoop and HBase
+
+## Introduction
 
 HBase is a data model that is designed to provide quick random access to huge amounts of structured data. This tutorial shows how to set up HBase on Hadoop File Systems
 using Google Cloud Instance.
@@ -54,7 +56,7 @@ Zookeeper is an open-source project that provides services like maintaining conf
 * Clients communicate with region servers via zookeeper.
 * In pseudo and standalone modes, HBase itself will take care of zookeeper.
 
-# Google Cloud Instance
+## Google Cloud Instance
 
 For the purpose of this tutorial, we use google clound instance virtual machine to demontrate how to install hbase. However, in reality, if you should most likely use [Bigtable](https://cloud.google.com/bigtable/docs/) provided by Google.
 
@@ -78,7 +80,7 @@ To keep things simple, we will allow both http and https traffics.
 
 That's all we need for setup, now let's SSH to the machine and start the dirty work. 
 
-# Create Account
+## Create Account
 
 It is recommended to create a separate user for Hadoop to isolate the Hadoop file system from the Unix file system. We created a user `hadoop` with password `password` below.
 
@@ -149,7 +151,7 @@ Finally, don't forget to exit from ssh.
 	logout
 	Connection to localhost closed.
 	
-# Install Java
+## Install Java
 
 If you have Java installed on the machine, you can skip this step. Otherwise, let's install it.
 	
@@ -173,7 +175,7 @@ And follow by
 
 	$ source ~/.profile
 
-# Install Hadoop
+## Install Hadoop
 
 Go to the apache website to check for the most recent version of hadoop [http://hadoop.apache.org/releases.html](http://hadoop.apache.org/releases.html) and also pick a recommanded remote url. 
 
@@ -225,7 +227,7 @@ And again,
 
 	$ source .profile
 
-# Hadoop Configurations
+## Hadoop Configurations
 
 All the hadoop configuration files are store under the following folder: 
 
@@ -368,14 +370,14 @@ localhost: starting nodemanager, logging to /usr/local/hadoop/logs/yarn-yzhong_c
 That's all about installing hadoop. We will check the hadoop dashboard with the following urls:
 
 * [http://104.198.67.52:50070/dfshealth.html](http://104.198.67.52:50070/dfshealth.html)
-  ![](dfs_health.png)
+![](dfs_health.png)
 * [http://104.198.67.52:8088/cluster](http://104.198.67.52:8088/cluster)
-  ![](hadoop_cluster.png)
+![](hadoop_cluster.png)
 
 Well, don't forget to replace 104.198.67.52 with your vm's ip address.
 
 
-# Install Hbase
+## Install Hbase
 
 We can install HBase in any of the three modes: Standalone mode, Pseudo Distributed mode, and Fully Distributed mode. We are installing HBase in Pseudo-Distributed Mode here.
 
@@ -400,11 +402,11 @@ Edit `JAVA_HOME` in shell script `hbase-env.sh` under folder `/usr/local/Hbase/c
 	export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
 	
 
-# HBase Configurations
+## HBase Configurations
 
 All the configuration files are under folder `/usr/local/Hbase/conf/`.
 
-**hbase-site.xml **
+**hbase-site.xml**
 	
 ```
 <configuration>
@@ -454,11 +456,7 @@ Version 1.2.5, rd7b05f79dee10e0ada614765bb354b93d615a157, Wed Mar  1 00:34:48 CS
 hbase(main):001:0> 
 ```
 
-All-in-one logs:
-
-* Start dfs
-* Start yarn
-* Start HBase
+All-in-one logs: start dfs, yarn and HBase.
 
 ```
 root@instance-2:/home/yzhong_cs# start-dfs.sh
@@ -498,8 +496,8 @@ drwxr-xr-x   - root supergroup          0 2017-05-15 02:02 /hbase/oldWALs
 That’s all about installing HBase. We will check the hadoop dashboard with the following urls:
 
 * http://104.198.67.52:16010/master-status
-  ![](hbase_master.png)
 
+![](hbase_master.png)
 
 Reference: 
 
