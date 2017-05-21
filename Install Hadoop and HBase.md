@@ -156,7 +156,7 @@ Finally, don't forget to exit from ssh.
 If you have Java installed on the machine, you can skip this step. Otherwise, let's install it.
 	
 	$ sudo apt-get update
-	$ sudo sudo apt-get install default-jre
+	$ sudo apt-get install default-jre
 	$ sudo apt-get install default-jdk
 
 And check its version to make sure that we've installed java successfully. 
